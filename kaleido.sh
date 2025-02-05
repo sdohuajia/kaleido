@@ -51,7 +51,7 @@ function setup_kaleido() {
     sleep 2  # 等待1秒钟确保会话已启动
 
     # 进入目录并启动 Node.js
-    screen -S openledger -X stuff "cd /root/kaleido && npm run start\n" 
+    screen -S kaleido -X stuff "cd /root/kaleido && npm start\n" 
     echo "使用 'screen -r kaleido' 命令来查看日志。"
     echo "要退出 screen 会话，请按 Ctrl+A+D。"
 
