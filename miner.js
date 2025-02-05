@@ -1,11 +1,9 @@
-// miner.js
-import axios from 'axios'
-import chalk from 'chalk'
+import axios from 'axios';
+import chalk from 'chalk';
 import * as fs from 'fs/promises';
 import { readFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import {displayBanner} from './banner.js';
 
 class KaleidoMiningBot {
     constructor(wallet, botIndex) {
@@ -44,7 +42,7 @@ class KaleidoMiningBot {
             this.miningState.startTime = session.startTime;
             this.currentEarnings = session.earnings;
             this.referralBonus = session.referralBonus;
-            console.log(chalk.green(`[钱包 ${this.botIndex}] 成功加载上一次会话`));
+            console.log(chalk.green(`[钱包 ${this.botIndex}] 成功加载前一个会话`));
             return true;
         } catch (error) {
             return false;
@@ -70,18 +68,18 @@ class KaleidoMiningBot {
             // 1. 检查注册状态
             const regResponse = await this.retryRequest(
                 () => this.api.get(`/check-registration?wallet=${this.wallet}`),
-                "检查注册"
+                "注册检查"
             );
 
             if (!regResponse.data.isRegistered) {
                 throw new Error('钱包未注册');
             }
 
-            // 2. 尝试加载上一次会话
+            // 2. 尝试加载前一个会话
             const hasSession = await this.loadSession();
             
             if (!hasSession) {
-                // 如果没有上一次会话，初始化新值
+                // 仅在没有前一个会话时初始化新值
                 this.referralBonus = regResponse.data.userData.referralBonus;
                 this.currentEarnings = {
                     total: regResponse.data.userData.referralBonus || 0,
@@ -91,7 +89,7 @@ class KaleidoMiningBot {
                 this.miningState.startTime = Date.now();
             }
 
-            // 3. 开始挖矿会话
+            // 3. 启动挖矿会话
             this.miningState.isActive = true;
             
             console.log(chalk.green(`[钱包 ${this.botIndex}] 挖矿${hasSession ? '恢复' : '初始化'}成功`));
@@ -133,7 +131,7 @@ class KaleidoMiningBot {
 
             const response = await this.retryRequest(
                 () => this.api.post('/update-balance', payload),
-                "更新余额"
+                "余额更新"
             );
 
             if (response.data.success) {
@@ -158,12 +156,12 @@ class KaleidoMiningBot {
         console.log(chalk.yellow(`
         === [钱包 ${this.botIndex}] ${statusType} ===
         钱包: ${this.wallet}
-        运行时间: ${uptime}s | 活跃: ${this.miningState.isActive}
-        算力: ${this.stats.hashrate} MH/s
+        上机时间: ${uptime}s | 活跃: ${this.miningState.isActive}
+        哈希率: ${this.stats.hashrate} MH/s
         总计: ${chalk.cyan(this.currentEarnings.total.toFixed(8))} KLDO
-        待处理: ${chalk.yellow(this.currentEarnings.pending.toFixed(8))} KLDO
+        待定: ${chalk.yellow(this.currentEarnings.pending.toFixed(8))} KLDO
         已支付: ${chalk.green(this.currentEarnings.paid.toFixed(8))} KLDO
-        推荐奖励: ${chalk.magenta(`+${(this.referralBonus * 100).toFixed(1)}%`)}
+        推荐奖金: ${chalk.magenta(`+${(this.referralBonus * 100).toFixed(1)}%`)}
         `));
     }
 
@@ -186,7 +184,7 @@ export class MiningCoordinator {
     static instance = null;
     
     constructor() {
-        // 单例模式，防止多个实例
+        // Singleton pattern to prevent multiple instances
         if (MiningCoordinator.instance) {
             return MiningCoordinator.instance;
         }
@@ -205,37 +203,36 @@ export class MiningCoordinator {
                 .map(line => line.trim())
                 .filter(line => line.startsWith('0x'));
         } catch (error) {
-            console.error('加载钱包失败:', error.message);
+            console.error('加载钱包时出错:', error.message);
             return [];
         }
     }
 
     async start() {
-        // 防止多次启动
+        // Prevent multiple starts
         if (this.isRunning) {
-            console.log(chalk.yellow('挖矿协调器已在运行中'));
+            console.log(chalk.yellow('挖矿协调器已经在运行'));
             return;
         }
         
         this.isRunning = true;
-        displayBanner();
         const wallets = await this.loadWallets();
         
         if (wallets.length === 0) {
-            console.log(chalk.red('wallets.txt 中没有找到有效的钱包'));
+            console.log(chalk.red('在 wallets.txt 中未找到有效的钱包'));
             return;
         }
 
-        console.log(chalk.blue(`已加载 ${wallets.length} 个钱包\n`));
+        console.log(chalk.blue(`加载了 ${wallets.length} 个钱包\n`));
 
-        // 初始化所有机器人
+        // Initialize all bots
         this.bots = wallets.map((wallet, index) => {
             const bot = new KaleidoMiningBot(wallet, index + 1);
             bot.initialize();
             return bot;
         });
 
-        // 处理关闭
+        // Handle shutdown
         process.on('SIGINT', async () => {
             console.log(chalk.yellow('\n正在关闭矿工...'));
             this.totalPaid = (await Promise.all(this.bots.map(bot => bot.stop())))
@@ -244,7 +241,7 @@ export class MiningCoordinator {
             console.log(chalk.green(`
             === 最终总结 ===
             总钱包数: ${this.bots.length}
-            总支付: ${this.totalPaid.toFixed(8)} KLDO
+            总已支付: ${this.totalPaid.toFixed(8)} KLDO
             `));
             process.exit();
         });
